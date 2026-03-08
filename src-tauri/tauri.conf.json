@@ -1,0 +1,119 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "LIS - Advertisement",
+  "version": "0.1.0",
+  "identifier": "com.lis.advertisement",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "LIS - Advertisement",
+        "width": 1200,
+        "height": 700,
+        "resizable": false,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true
+      },
+      {
+        "label": "overlay",
+        "url": "/player",
+        "visible": false,
+        "resizable": false,
+        "fullscreen": true,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "create": false
+      },
+      {
+        "label": "overlay_mini",
+        "url": "/player-mini",
+        "visible": false,
+        "resizable": false,
+        "fullscreen": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "create": false,
+        "width": 560,
+        "height": 120
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/**", "$APPLOCALDATA/**", "E:/**"]
+      },
+      "capabilities": [
+        {
+          "identifier": "default",
+          "windows": ["main", "overlay", "overlay_mini"],
+          "permissions": [
+            "core:window:allow-show",
+            "core:window:allow-hide",
+            "core:window:allow-minimize",
+            "core:window:allow-unminimize",
+            "core:window:allow-close",
+            "core:window:allow-set-decorations",
+            "core:window:allow-set-fullscreen",
+            "core:window:allow-set-always-on-top",
+            "core:window:allow-set-focus",
+            "core:window:allow-maximize",
+            "core:window:allow-unmaximize",
+            "core:window:allow-set-skip-taskbar",
+            "core:window:allow-set-size",
+            "core:window:allow-set-position",
+            "core:window:allow-current-monitor",
+            "core:default",
+            "fs:default",
+            "fs:read-all",
+            "fs:write-all",
+            "fs:allow-mkdir",
+            {
+              "identifier": "fs:scope",
+              "allow": [
+                "$HOME/**",
+                "$DOWNLOAD/**",
+                "$DOCUMENT/**",
+                "$DESKTOP/**",
+                "$APPDATA/**",
+                "$APPLOCALDATA/**",
+                "E:/**"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico"
+      }
+    }
+  }
+}
