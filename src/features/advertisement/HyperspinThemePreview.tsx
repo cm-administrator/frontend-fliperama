@@ -7,6 +7,11 @@ type ViewportSize = {
   height: number;
 };
 
+type HyperspinThemePreviewProps = {
+  transparentBackground?: boolean;
+  className?: string;
+};
+
 function useContainerSize(containerRef: React.RefObject<HTMLDivElement | null>) {
   const [size, setSize] = useState<ViewportSize>({ width: 0, height: 0 });
 
@@ -57,7 +62,10 @@ function buildLayerStyle(layer: HyperspinThemeLayer): React.CSSProperties {
   };
 }
 
-export function HyperspinThemePreview() {
+export function HyperspinThemePreview({
+  transparentBackground = false,
+  className = "",
+}: HyperspinThemePreviewProps) {
   const { theme, loading, error } = useHyperspinTheme();
   const mountedVideosRef = useRef<HTMLVideoElement[]>([]);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -98,9 +106,17 @@ export function HyperspinThemePreview() {
 
   mountedVideosRef.current = [];
 
+  const baseBackgroundClass = transparentBackground ? "bg-transparent" : "bg-black";
+
   if (loading) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-black text-zinc-400">
+      <div
+        className={[
+          "flex h-full w-full items-center justify-center text-zinc-400",
+          baseBackgroundClass,
+          className,
+        ].join(" ")}
+      >
         Carregando theme...
       </div>
     );
@@ -108,7 +124,13 @@ export function HyperspinThemePreview() {
 
   if (error) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-red-500">
+      <div
+        className={[
+          "flex h-full w-full items-center justify-center px-6 text-center text-sm text-red-500",
+          baseBackgroundClass,
+          className,
+        ].join(" ")}
+      >
         {error}
       </div>
     );
@@ -116,7 +138,13 @@ export function HyperspinThemePreview() {
 
   if (!theme) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-black text-zinc-500">
+      <div
+        className={[
+          "flex h-full w-full items-center justify-center text-zinc-500",
+          baseBackgroundClass,
+          className,
+        ].join(" ")}
+      >
         Nenhum theme carregado
       </div>
     );
@@ -124,7 +152,13 @@ export function HyperspinThemePreview() {
 
   if (renderableLayers.length === 0) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-zinc-400">
+      <div
+        className={[
+          "flex h-full w-full items-center justify-center px-6 text-center text-sm text-zinc-400",
+          baseBackgroundClass,
+          className,
+        ].join(" ")}
+      >
         Theme carregado, mas sem camadas compatíveis para renderização.
       </div>
     );
@@ -133,7 +167,11 @@ export function HyperspinThemePreview() {
   return (
     <div
       ref={containerRef}
-      className="relative h-full w-full overflow-hidden bg-black"
+      className={[
+        "relative h-full w-full overflow-hidden",
+        baseBackgroundClass,
+        className,
+      ].join(" ")}
     >
       <div className="flex h-full w-full items-center justify-center">
         <div

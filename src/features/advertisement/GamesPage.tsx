@@ -11,7 +11,7 @@ type GamesPageLocationState = {
   platform: HyperspinPlatformTheme;
 };
 
-function GamePreview({ game }: { game: HyperspinGame | null }) {
+function GameBackground({ game }: { game: HyperspinGame | null }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -23,58 +23,39 @@ function GamePreview({ game }: { game: HyperspinGame | null }) {
   }, [game?.videoUrl]);
 
   if (!game) {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-black text-zinc-500">
-        Nenhum jogo encontrado
-      </div>
-    );
+    return <div className="absolute inset-0 bg-black" />;
   }
 
   if (game.videoUrl) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-black">
-        <video
-          ref={videoRef}
-          key={game.videoUrl}
-          src={game.videoUrl}
-          className="h-full w-full object-contain"
-          autoPlay
-          muted
-          loop
-          playsInline
-          controls={false}
-        />
-      </div>
+      <video
+        ref={videoRef}
+        key={game.videoUrl}
+        src={game.videoUrl}
+        className="absolute inset-0 h-full w-full object-cover"
+        autoPlay
+        // muted
+        loop
+        playsInline
+        controls={false}
+      />
     );
   }
 
   if (game.wheelImageUrl) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-black p-8">
+      <div className="absolute inset-0 flex items-center justify-center bg-black">
         <img
           src={game.wheelImageUrl}
           alt={game.description}
-          className="max-h-full max-w-full object-contain"
+          className="max-h-[70%] max-w-[70%] object-contain opacity-90"
           draggable={false}
         />
       </div>
     );
   }
 
-  return (
-    <div className="flex h-full w-full items-center justify-center bg-black p-8 text-center">
-      <div>
-        <div className="text-3xl font-semibold text-white">
-          {game.description}
-        </div>
-        <div className="mt-3 text-sm text-zinc-400">
-          {[game.year, game.manufacturer, game.genre]
-            .filter(Boolean)
-            .join(" • ") || game.name}
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="absolute inset-0 bg-black" />;
 }
 
 export function GamesPage() {
@@ -88,8 +69,9 @@ export function GamesPage() {
   const [loadingGames, setLoadingGames] = useState(false);
   const [gamesError, setGamesError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchVisible, setSearchVisible] = useState(false);
 
-  const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const wheelContainerRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const filteredGames = useMemo(() => {
@@ -116,7 +98,19 @@ export function GamesPage() {
 
   const selectedGame = useMemo(() => {
     if (filteredGames.length === 0) return null;
-    return filteredGames[Math.min(selectedIndex, filteredGames.length - 1)] ?? null;
+    return (
+      filteredGames[Math.min(selectedIndex, filteredGames.length - 1)] ?? null
+    );
+  }, [filteredGames, selectedIndex]);
+
+  const visibleWheelItems = useMemo(() => {
+    return filteredGames
+      .map((game, index) => ({
+        game,
+        index,
+        offset: index - selectedIndex,
+      }))
+      .filter((item) => Math.abs(item.offset) <= 4);
   }, [filteredGames, selectedIndex]);
 
   const loadGames = useCallback(async () => {
@@ -152,17 +146,10 @@ export function GamesPage() {
   }, [searchTerm]);
 
   useEffect(() => {
-    if (!selectedGame) return;
-
-    const element = itemRefs.current[selectedGame.name];
-    element?.scrollIntoView({
-      block: "nearest",
-    });
-  }, [selectedGame]);
-
-  useEffect(() => {
-    searchInputRef.current?.focus();
-  }, []);
+    if (searchVisible) {
+      searchInputRef.current?.focus();
+    }
+  }, [searchVisible]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -173,7 +160,22 @@ export function GamesPage() {
         tagName === "textarea" ||
         target?.isContentEditable === true;
 
+      if (event.key === "/") {
+        if (isTypingField) return;
+
+        event.preventDefault();
+        setSearchVisible(true);
+        return;
+      }
+
       if (event.key === "Escape") {
+        if (searchVisible || searchTerm) {
+          event.preventDefault();
+          setSearchVisible(false);
+          setSearchTerm("");
+          return;
+        }
+
         event.preventDefault();
         navigate(-1);
         return;
@@ -215,7 +217,14 @@ export function GamesPage() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [filteredGames.length, navigate, platform?.name, selectedGame]);
+  }, [
+    filteredGames.length,
+    navigate,
+    platform?.name,
+    searchTerm,
+    searchVisible,
+    selectedGame,
+  ]);
 
   if (!platform) {
     return (
@@ -237,103 +246,134 @@ export function GamesPage() {
   }
 
   return (
-    <div className="grid h-screen w-screen grid-cols-[420px_1fr] overflow-hidden bg-zinc-950 text-white">
-      <aside className="flex h-full min-h-0 flex-col border-r border-zinc-800 bg-zinc-900">
-        <div className="shrink-0 border-b border-zinc-800 bg-zinc-900 px-5 py-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="truncate text-lg font-semibold">{platform.name}</h1>
-              <p className="mt-1 text-sm text-zinc-400">Escolha um jogo</p>
-            </div>
+    <div className="relative h-screen w-screen overflow-hidden bg-black text-white">
+      <GameBackground game={selectedGame} />
 
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="shrink-0 rounded bg-zinc-800 px-3 py-2 text-sm text-white hover:bg-zinc-700"
-            >
-              Voltar
-            </button>
-          </div>
+      <div className="pointer-events-none absolute inset-0 from-black/30 via-transparent to-black/30" />
+      <div className="pointer-events-none absolute inset-0  from-black/55 via-transparent to-black/25" />
 
-          <div className="mt-4">
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Filtrar por nome..."
-              className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-zinc-500"
-            />
-          </div>
+      <div className="absolute left-6 top-6 z-30 rounded-md bg-black/45 px-3 py-2 text-xs text-zinc-300 backdrop-blur-sm">
+        {platform.name} • Enter inicia • / filtra • Esc volta
+      </div>
+
+      {searchVisible ? (
+        <div className="absolute left-1/2 top-6 z-40 -translate-x-1/2">
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Filtrar jogo..."
+            className="w-full rounded-xl border border-zinc-700 bg-black/75 px-4 py-3 text-sm text-white outline-none backdrop-blur-md placeholder:text-zinc-500 focus:border-zinc-500"
+          />
         </div>
+      ) : null}
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {loadingGames ? (
-            <div className="px-5 py-4 text-sm text-zinc-400">
-              Lendo jogos...
-            </div>
-          ) : gamesError ? (
-            <div className="px-5 py-4 text-sm text-red-500">{gamesError}</div>
-          ) : filteredGames.length === 0 ? (
-            <div className="px-5 py-4 text-sm text-zinc-500">
-              {searchTerm.trim()
-                ? "Nenhum jogo encontrado para esse filtro."
-                : "Nenhum jogo encontrado."}
-            </div>
-          ) : (
-            <ul className="py-2">
-              {filteredGames.map((game, index) => {
-                const isSelected = index === selectedIndex;
-                const hasMedia = Boolean(game.videoUrl || game.wheelImageUrl);
+      {loadingGames ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center text-sm text-zinc-300">
+          Lendo jogos...
+        </div>
+      ) : gamesError ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center px-6 text-center text-sm text-red-500">
+          {gamesError}
+        </div>
+      ) : filteredGames.length === 0 ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center px-6 text-center text-sm text-zinc-400">
+          {searchTerm.trim()
+            ? "Nenhum jogo encontrado para esse filtro."
+            : "Nenhum jogo encontrado."}
+        </div>
+      ) : (
+        <div
+          ref={wheelContainerRef}
+          className="absolute left-[6%] top-1/2 z-30 flex w-[40%] -translate-y-1/2 flex-col items-start justify-center"
+        >
+          {visibleWheelItems.map(({ game, offset }) => {
+            const absOffset = Math.abs(offset);
+            const isSelected = offset === 0;
 
-                return (
-                  <li key={game.name}>
-                    <button
-                      ref={(element) => {
-                        itemRefs.current[game.name] = element;
-                      }}
-                      type="button"
-                      onMouseEnter={() => setSelectedIndex(index)}
-                      onClick={() => {
-                        launchSelectedGame({
-                          platformName: platform.name,
-                          romName: game.name,
-                        }).catch((error) => {
-                          console.error("Erro ao executar jogo:", error);
-                        });
-                      }}
+            const translateY = offset * 92;
+            const translateX =
+              offset === 0 ? 0 : offset < 0 ? absOffset * 14 : absOffset * 18;
+
+            const scale =
+              absOffset === 0
+                ? 1
+                : absOffset === 1
+                  ? 0.82
+                  : absOffset === 2
+                    ? 0.66
+                    : absOffset === 3
+                      ? 0.54
+                      : 0.42;
+
+            const opacity =
+              absOffset === 0
+                ? 1
+                : absOffset === 1
+                  ? 0.72
+                  : absOffset === 2
+                    ? 0.46
+                    : absOffset === 3
+                      ? 0.28
+                      : 0.16;
+
+            return (
+              <button
+                key={game.name}
+                type="button"
+                onClick={() => {
+                  launchSelectedGame({
+                    platformName: platform.name,
+                    romName: game.name,
+                  }).catch((error) => {
+                    console.error("Erro ao executar jogo:", error);
+                  });
+                }}
+                className="absolute left-0 origin-left text-left transition-all duration-200 ease-out"
+                style={{
+                  transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
+                  opacity,
+                  zIndex: 100 - absOffset,
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  {isSelected ? (
+                    <div className="h-10 w-1.5 rounded-full bg-white/90 shadow-[0_0_18px_rgba(255,255,255,0.45)]" />
+                  ) : (
+                    <div className="h-10 w-1.5 rounded-full bg-transparent" />
+                  )}
+
+                  <div className="min-w-0">
+                    <div
                       className={[
-                        "flex w-full flex-col px-5 py-3 text-left transition-colors",
+                        "truncate font-black uppercase tracking-wide transition-all",
                         isSelected
-                          ? "bg-zinc-800 text-white"
-                          : "text-zinc-300 hover:bg-zinc-800/60",
+                          ? "text-5xl text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.18)]"
+                          : absOffset === 1
+                            ? "text-3xl text-zinc-200"
+                            : absOffset === 2
+                              ? "text-2xl text-zinc-300"
+                              : "text-xl text-zinc-400",
                       ].join(" ")}
                     >
-                      <span className="truncate">{game.description}</span>
+                      {game.description}
+                    </div>
 
-                      <span className="mt-1 text-xs text-zinc-400">
+                    {isSelected ? (
+                      <div className="mt-2 text-sm text-zinc-300">
                         {[game.year, game.manufacturer, game.genre]
                           .filter(Boolean)
                           .join(" • ") || game.name}
-                      </span>
-
-                      {!hasMedia ? (
-                        <span className="mt-1 text-[11px] text-amber-400">
-                          Sem mídia encontrada
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
-      </aside>
-
-      <main className="h-full w-full bg-black">
-        <GamePreview game={selectedGame} />
-      </main>
+      )}
     </div>
   );
 }

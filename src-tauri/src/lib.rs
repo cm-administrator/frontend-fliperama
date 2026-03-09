@@ -17,6 +17,11 @@ use std::path::Path;
 use std::process::Command;
 
 #[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+  app.exit(0);
+}
+
+#[tauri::command]
 fn launch_mame(mame_path: String, rom_name: String, roms_dir: String) -> Result<(), String> {
     let mame_exists = Path::new(&mame_path).exists();
     let roms_exists = Path::new(&roms_dir).exists();
@@ -157,7 +162,8 @@ pub fn run() {
       ensure_overlay_window,
       ensure_overlay_mini_window,
       stop_running_overlays,
-      launch_mame
+      launch_mame,
+      quit_app
     ])
     .setup(|app| {
 

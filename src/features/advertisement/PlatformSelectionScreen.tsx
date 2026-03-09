@@ -1,10 +1,10 @@
+import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { exit } from "@tauri-apps/plugin-process";
+import { useHyperspinTheme } from "../../app/provider/HyperspinThemeProvider";
 import {
   listHyperspinPlatforms,
   type HyperspinPlatformTheme,
 } from "../../services/hyperspinPlatformThemesService";
-import { useHyperspinTheme } from "../../app/provider/HyperspinThemeProvider";
 import { HyperspinThemePreview } from "./HyperspinThemePreview";
 
 type PlatformSelectionScreenProps = {
@@ -12,6 +12,57 @@ type PlatformSelectionScreenProps = {
   visible?: boolean;
   onSelectPlatform: (platform: HyperspinPlatformTheme) => void | Promise<void>;
 };
+
+function PlatformBackground({
+  platform,
+}: {
+  platform: HyperspinPlatformTheme | null;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !platform?.videoUrl) return;
+
+    video.load();
+    void video.play().catch(() => {});
+  }, [platform?.videoUrl]);
+
+  if (!platform) {
+    return <div className="absolute inset-0 bg-black" />;
+  }
+
+  if (platform.videoUrl) {
+    return (
+      <video
+        ref={videoRef}
+        key={platform.videoUrl}
+        src={platform.videoUrl}
+        className="absolute inset-0 h-full w-full object-cover"
+        autoPlay
+        // muted
+        loop
+        playsInline
+        controls={false}
+      />
+    );
+  }
+
+  if (platform.wheelImageUrl) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-black">
+        <img
+          src={platform.wheelImageUrl}
+          alt={platform.name}
+          className="max-h-[70%] max-w-[70%] object-contain opacity-90"
+          draggable={false}
+        />
+      </div>
+    );
+  }
+
+  return <div className="absolute inset-0 bg-black" />;
+}
 
 export function PlatformSelectionScreen({
   themesBasePath,
@@ -25,8 +76,9 @@ export function PlatformSelectionScreen({
   const [loadingPlatforms, setLoadingPlatforms] = useState(false);
   const [platformsError, setPlatformsError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchVisible, setSearchVisible] = useState(false);
 
-  const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const wheelContainerRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const filteredPlatforms = useMemo(() => {
@@ -48,6 +100,16 @@ export function PlatformSelectionScreen({
         Math.min(selectedIndex, filteredPlatforms.length - 1)
       ] ?? null
     );
+  }, [filteredPlatforms, selectedIndex]);
+
+  const visibleWheelItems = useMemo(() => {
+    return filteredPlatforms
+      .map((platform, index) => ({
+        platform,
+        index,
+        offset: index - selectedIndex,
+      }))
+      .filter((item) => Math.abs(item.offset) <= 4);
   }, [filteredPlatforms, selectedIndex]);
 
   const loadPlatforms = useCallback(async () => {
@@ -77,15 +139,6 @@ export function PlatformSelectionScreen({
   }, [searchTerm]);
 
   useEffect(() => {
-    if (!selectedPlatform) return;
-
-    const element = itemRefs.current[selectedPlatform.themeZipPath];
-    element?.scrollIntoView({
-      block: "nearest",
-    });
-  }, [selectedPlatform]);
-
-  useEffect(() => {
     if (!visible) return;
 
     if (!selectedPlatform) {
@@ -98,8 +151,11 @@ export function PlatformSelectionScreen({
 
   useEffect(() => {
     if (!visible) return;
-    searchInputRef.current?.focus();
-  }, [visible]);
+
+    if (searchVisible) {
+      searchInputRef.current?.focus();
+    }
+  }, [visible, searchVisible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -116,11 +172,28 @@ export function PlatformSelectionScreen({
         event.preventDefault();
         event.stopPropagation();
 
-        exit(0).catch((error) => {
+        invoke("quit_app").catch((error) => {
           console.error("Erro ao encerrar aplicação:", error);
         });
 
         return;
+      }
+
+      if (event.key === "/") {
+        if (isTypingField) return;
+
+        event.preventDefault();
+        setSearchVisible(true);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        if (searchVisible || searchTerm) {
+          event.preventDefault();
+          setSearchVisible(false);
+          setSearchTerm("");
+          return;
+        }
       }
 
       if (filteredPlatforms.length === 0) return;
@@ -152,83 +225,133 @@ export function PlatformSelectionScreen({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [visible, filteredPlatforms.length, selectedPlatform, onSelectPlatform]);
+  }, [
+    visible,
+    filteredPlatforms.length,
+    selectedPlatform,
+    onSelectPlatform,
+    searchVisible,
+    searchTerm,
+  ]);
 
   if (!visible) return null;
 
   return (
-    <div className="grid h-screen w-screen grid-cols-[360px_1fr] overflow-hidden bg-zinc-950 text-white">
-      <aside className="flex h-full min-h-0 flex-col border-r border-zinc-800 bg-zinc-900">
-        <div className="shrink-0 border-b border-zinc-800 bg-zinc-900 px-5 py-4">
-          <h1 className="text-lg font-semibold">Escolha a plataforma</h1>
-          <p className="mt-1 text-sm text-zinc-400">{themesBasePath}</p>
+    <div className="relative h-screen w-screen overflow-hidden bg-black text-white">
+      <PlatformBackground platform={selectedPlatform} />
 
-          <div className="mt-4">
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Filtrar por nome..."
-              className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-zinc-500"
-            />
-          </div>
+      <div className="absolute inset-0">
+        <HyperspinThemePreview transparentBackground />
+      </div>
+
+      <div className="pointer-events-none absolute inset-0  from-black/30 via-transparent to-black/30" />
+      <div className="pointer-events-none absolute inset-0  from-black/45 via-transparent to-black/20" />
+
+      <div className="absolute left-6 top-6 z-30 rounded-md bg-black/45 px-3 py-2 text-xs text-zinc-300 backdrop-blur-sm">
+        Enter seleciona • / filtra • Esc limpa filtro • Ctrl+Shift+F encerra
+      </div>
+
+      {searchVisible ? (
+        <div className="absolute left-1/2 top-6 z-40 -translate-x-1/2">
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Filtrar plataforma..."
+            className="w-full rounded-xl border border-zinc-700 bg-black/75 px-4 py-3 text-sm text-white outline-none backdrop-blur-md placeholder:text-zinc-500 focus:border-zinc-500"
+          />
         </div>
+      ) : null}
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {loadingPlatforms ? (
-            <div className="px-5 py-4 text-sm text-zinc-400">
-              Lendo plataformas...
-            </div>
-          ) : platformsError ? (
-            <div className="px-5 py-4 text-sm text-red-500">
-              {platformsError}
-            </div>
-          ) : filteredPlatforms.length === 0 ? (
-            <div className="px-5 py-4 text-sm text-zinc-500">
-              {searchTerm.trim()
-                ? "Nenhuma plataforma encontrada para esse filtro."
-                : "Nenhuma plataforma encontrada."}
-            </div>
-          ) : (
-            <ul className="py-2">
-              {filteredPlatforms.map((platform, index) => {
-                const isSelected = index === selectedIndex;
-
-                return (
-                  <li key={platform.themeZipPath}>
-                    <button
-                      ref={(element) => {
-                        itemRefs.current[platform.themeZipPath] = element;
-                      }}
-                      type="button"
-                      onMouseEnter={() => setSelectedIndex(index)}
-                      onClick={() => void onSelectPlatform(platform)}
-                      className={[
-                        "flex w-full items-center justify-between px-5 py-3 text-left transition-colors",
-                        isSelected
-                          ? "bg-zinc-800 text-white"
-                          : "text-zinc-300 hover:bg-zinc-800/60",
-                      ].join(" ")}
-                    >
-                      <span className="truncate">{platform.name}</span>
-                      {isSelected ? (
-                        <span className="ml-3 text-xs text-zinc-400">
-                          Enter
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+      {loadingPlatforms ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center text-sm text-zinc-300">
+          Lendo plataformas...
         </div>
-      </aside>
+      ) : platformsError ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center px-6 text-center text-sm text-red-500">
+          {platformsError}
+        </div>
+      ) : filteredPlatforms.length === 0 ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center px-6 text-center text-sm text-zinc-400">
+          {searchTerm.trim()
+            ? "Nenhuma plataforma encontrada para esse filtro."
+            : "Nenhuma plataforma encontrada."}
+        </div>
+      ) : (
+        <div
+          ref={wheelContainerRef}
+          className="absolute left-[6%] top-1/2 z-30 flex w-[34%] -translate-y-1/2 flex-col items-start justify-center"
+        >
+          {visibleWheelItems.map(({ platform, offset }) => {
+            const absOffset = Math.abs(offset);
+            const isSelected = offset === 0;
 
-      <main className="h-full w-full bg-black">
-        <HyperspinThemePreview />
-      </main>
+            const translateY = offset * 92;
+            const translateX =
+              offset === 0 ? 0 : offset < 0 ? absOffset * 14 : absOffset * 18;
+
+            const scale =
+              absOffset === 0
+                ? 1
+                : absOffset === 1
+                  ? 0.82
+                  : absOffset === 2
+                    ? 0.66
+                    : absOffset === 3
+                      ? 0.54
+                      : 0.42;
+
+            const opacity =
+              absOffset === 0
+                ? 1
+                : absOffset === 1
+                  ? 0.72
+                  : absOffset === 2
+                    ? 0.46
+                    : absOffset === 3
+                      ? 0.28
+                      : 0.16;
+
+            return (
+              <button
+                key={platform.themeZipPath}
+                type="button"
+                onClick={() => void onSelectPlatform(platform)}
+                className="absolute left-0 origin-left text-left transition-all duration-200 ease-out"
+                style={{
+                  transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
+                  opacity,
+                  zIndex: 100 - absOffset,
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  {isSelected ? (
+                    <div className="h-9 w-1.5 rounded-full bg-white/90 shadow-[0_0_18px_rgba(255,255,255,0.45)]" />
+                  ) : (
+                    <div className="h-9 w-1.5 rounded-full bg-transparent" />
+                  )}
+
+                  <div
+                    className={[
+                      " truncate font-black uppercase tracking-wide transition-all",
+                      isSelected
+                        ? "text-5xl text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.18)]"
+                        : absOffset === 1
+                          ? "text-3xl text-zinc-200"
+                          : absOffset === 2
+                            ? "text-2xl text-zinc-300"
+                            : "text-xl text-zinc-400",
+                    ].join(" ")}
+                  >
+                    {platform.name}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
