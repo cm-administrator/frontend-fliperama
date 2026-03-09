@@ -71,9 +71,21 @@ export function GamesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
   const [launchingGameName, setLaunchingGameName] = useState<string | null>(null);
+  const [keyboardUnlockAt, setKeyboardUnlockAt] = useState(0);
 
   const wheelContainerRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      // Evita que teclas usadas no emulador (ex.: Enter/Esc)
+      // disparem ações acidentais ao devolver foco para o app.
+      setKeyboardUnlockAt(Date.now() + 450);
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    return () => window.removeEventListener("focus", handleWindowFocus);
+  }, []);
 
   const filteredGames = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -158,11 +170,36 @@ export function GamesPage() {
 
       setLaunchingGameName(game.name);
 
+      const clearLoadingOnBlurOrTimeout = new Promise<void>((resolve) => {
+        let done = false;
+
+        const finish = () => {
+          if (done) return;
+          done = true;
+          window.removeEventListener("blur", handleBlur);
+          clearTimeout(timer);
+          resolve();
+        };
+
+        const handleBlur = () => {
+          finish();
+        };
+
+        const timer = window.setTimeout(finish, 4000);
+        window.addEventListener("blur", handleBlur, { once: true });
+      });
+
       try {
-        await launchSelectedGame({
+        const launchPromise = launchSelectedGame({
           platformName: platform.name,
           romName: game.name,
         });
+
+        // O indicador fica até o jogo realmente iniciar (janela perde foco)
+        // ou, no pior caso, até um timeout curto.
+        await clearLoadingOnBlurOrTimeout;
+
+        await launchPromise;
       } catch (error) {
         console.error("Erro ao executar jogo:", error);
       } finally {
@@ -190,6 +227,11 @@ export function GamesPage() {
       }
 
       if (event.key === "Escape") {
+        if (Date.now() < keyboardUnlockAt) {
+          event.preventDefault();
+          return;
+        }
+
         if (searchVisible || searchTerm) {
           event.preventDefault();
           setSearchVisible(false);
@@ -203,6 +245,11 @@ export function GamesPage() {
       }
 
       if (event.key === "Enter" && selectedGame && !isTypingField) {
+        if (Date.now() < keyboardUnlockAt || event.repeat) {
+          event.preventDefault();
+          return;
+        }
+
         event.preventDefault();
         void launchGame(selectedGame);
         return;
@@ -239,6 +286,7 @@ export function GamesPage() {
     searchVisible,
     selectedGame,
     launchGame,
+    keyboardUnlockAt,
   ]);
 
   if (!platform) {
