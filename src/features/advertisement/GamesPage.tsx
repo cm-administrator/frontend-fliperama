@@ -70,9 +70,22 @@ export function GamesPage() {
   const [gamesError, setGamesError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
+  const [launchingGameName, setLaunchingGameName] = useState<string | null>(null);
+  const [keyboardUnlockAt, setKeyboardUnlockAt] = useState(0);
 
   const wheelContainerRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      // Evita que teclas usadas no emulador (ex.: Enter/Esc)
+      // disparem ações acidentais ao devolver foco para o app.
+      setKeyboardUnlockAt(Date.now() + 450);
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    return () => window.removeEventListener("focus", handleWindowFocus);
+  }, []);
 
   const filteredGames = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -151,6 +164,51 @@ export function GamesPage() {
     }
   }, [searchVisible]);
 
+  const launchGame = useCallback(
+    async (game: HyperspinGame) => {
+      if (!platform || launchingGameName) return;
+
+      setLaunchingGameName(game.name);
+
+      const clearLoadingOnBlurOrTimeout = new Promise<void>((resolve) => {
+        let done = false;
+
+        const finish = () => {
+          if (done) return;
+          done = true;
+          window.removeEventListener("blur", handleBlur);
+          clearTimeout(timer);
+          resolve();
+        };
+
+        const handleBlur = () => {
+          finish();
+        };
+
+        const timer = window.setTimeout(finish, 4000);
+        window.addEventListener("blur", handleBlur, { once: true });
+      });
+
+      try {
+        const launchPromise = launchSelectedGame({
+          platformName: platform.name,
+          romName: game.name,
+        });
+
+        // O indicador fica até o jogo realmente iniciar (janela perde foco)
+        // ou, no pior caso, até um timeout curto.
+        await clearLoadingOnBlurOrTimeout;
+
+        await launchPromise;
+      } catch (error) {
+        console.error("Erro ao executar jogo:", error);
+      } finally {
+        setLaunchingGameName(null);
+      }
+    },
+    [launchingGameName, platform],
+  );
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -169,6 +227,11 @@ export function GamesPage() {
       }
 
       if (event.key === "Escape") {
+        if (Date.now() < keyboardUnlockAt) {
+          event.preventDefault();
+          return;
+        }
+
         if (searchVisible || searchTerm) {
           event.preventDefault();
           setSearchVisible(false);
@@ -182,15 +245,13 @@ export function GamesPage() {
       }
 
       if (event.key === "Enter" && selectedGame && !isTypingField) {
+        if (Date.now() < keyboardUnlockAt || event.repeat) {
+          event.preventDefault();
+          return;
+        }
+
         event.preventDefault();
-
-        launchSelectedGame({
-          platformName: platform?.name ?? "",
-          romName: selectedGame.name,
-        }).catch((error) => {
-          console.error("Erro ao executar jogo:", error);
-        });
-
+        void launchGame(selectedGame);
         return;
       }
 
@@ -224,6 +285,8 @@ export function GamesPage() {
     searchTerm,
     searchVisible,
     selectedGame,
+    launchGame,
+    keyboardUnlockAt,
   ]);
 
   if (!platform) {
@@ -266,6 +329,12 @@ export function GamesPage() {
             placeholder="Filtrar jogo..."
             className="w-full rounded-xl border border-zinc-700 bg-black/75 px-4 py-3 text-sm text-white outline-none backdrop-blur-md placeholder:text-zinc-500 focus:border-zinc-500"
           />
+        </div>
+      ) : null}
+
+      {launchingGameName ? (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 text-base font-semibold text-zinc-100">
+          Carregando {launchingGameName}...
         </div>
       ) : null}
 
@@ -322,15 +391,9 @@ export function GamesPage() {
               <button
                 key={game.name}
                 type="button"
-                onClick={() => {
-                  launchSelectedGame({
-                    platformName: platform.name,
-                    romName: game.name,
-                  }).catch((error) => {
-                    console.error("Erro ao executar jogo:", error);
-                  });
-                }}
-                className="absolute left-0 origin-left text-left transition-all duration-200 ease-out"
+                onClick={() => void launchGame(game)}
+                disabled={Boolean(launchingGameName)}
+                className="absolute left-0 origin-left text-left transition-all duration-200 ease-out disabled:cursor-wait"
                 style={{
                   transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
                   opacity,

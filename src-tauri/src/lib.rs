@@ -13,7 +13,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 struct FocusState(Mutex<HWND>);
 
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[tauri::command]
@@ -34,24 +34,45 @@ fn launch_mame(mame_path: String, rom_name: String, roms_dir: String) -> Result<
         return Err(format!("Pasta de ROMs não encontrada em: {}", roms_dir));
     }
 
-    let mut child = Command::new(&mame_path)
+    let mame_dir = Path::new(&mame_path)
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| format!("Não foi possível resolver pasta do mame.exe: {}", mame_path))?;
+
+    let cfg_dir: PathBuf = mame_dir.join("cfg");
+    let nvram_dir: PathBuf = mame_dir.join("nvram");
+
+    std::fs::create_dir_all(&cfg_dir)
+        .map_err(|e| format!("Falha ao criar diretório cfg '{}': {}", cfg_dir.display(), e))?;
+    std::fs::create_dir_all(&nvram_dir).map_err(|e| {
+        format!(
+            "Falha ao criar diretório nvram '{}': {}",
+            nvram_dir.display(),
+            e
+        )
+    })?;
+
+    Command::new(&mame_path)
+        .current_dir(&mame_dir)
         .arg("-rompath")
         .arg(&roms_dir)
+        .arg("-cfg_directory")
+        .arg(&cfg_dir)
+        .arg("-nvram_directory")
+        .arg(&nvram_dir)
         .arg(&rom_name)
         .spawn()
         .map_err(|e| {
             format!(
-                "Falha ao executar MAME. mame_path='{}', roms_dir='{}', rom_name='{}', erro='{}'",
-                mame_path, roms_dir, rom_name, e
+                "Falha ao executar MAME. mame_path='{}', roms_dir='{}', rom_name='{}', cfg_dir='{}', nvram_dir='{}', erro='{}'",
+                mame_path,
+                roms_dir,
+                rom_name,
+                cfg_dir.display(),
+                nvram_dir.display(),
+                e
             )
         })?;
-
-    child.wait().map_err(|e| {
-        format!(
-            "MAME foi iniciado mas falhou ao aguardar fechamento. mame_path='{}', roms_dir='{}', rom_name='{}', erro='{}'",
-            mame_path, roms_dir, rom_name, e
-        )
-    })?;
 
     Ok(())
 }
