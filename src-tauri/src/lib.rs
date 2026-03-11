@@ -52,6 +52,8 @@ fn launch_mame(mame_path: String, rom_name: String, roms_dir: String) -> Result<
         )
     })?;
 
+    // IMPORTANTE: fullscreen exclusivo normalmente fica acima de qualquer overlay topmost.
+    // Para permitir mini overlay acima do jogo, rodamos o MAME em janela sem borda maximizada.
     Command::new(&mame_path)
         .current_dir(&mame_dir)
         .arg("-rompath")
@@ -60,6 +62,9 @@ fn launch_mame(mame_path: String, rom_name: String, roms_dir: String) -> Result<
         .arg(&cfg_dir)
         .arg("-nvram_directory")
         .arg(&nvram_dir)
+        .arg("-window")
+        .arg("-noborder")
+        .arg("-maximize")
         .arg(&rom_name)
         .spawn()
         .map_err(|e| {
