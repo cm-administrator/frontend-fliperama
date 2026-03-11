@@ -8,7 +8,6 @@ import {
 import { HyperspinThemePreview } from "./HyperspinThemePreview";
 
 type PlatformSelectionScreenProps = {
-  themesBasePath: string;
   visible?: boolean;
   onSelectPlatform: (platform: HyperspinPlatformTheme) => void | Promise<void>;
 };
@@ -65,7 +64,6 @@ function PlatformBackground({
 }
 
 export function PlatformSelectionScreen({
-  themesBasePath,
   visible = true,
   onSelectPlatform,
 }: PlatformSelectionScreenProps) {
@@ -117,7 +115,7 @@ export function PlatformSelectionScreen({
     setPlatformsError(null);
 
     try {
-      const items = await listHyperspinPlatforms(themesBasePath);
+      const items = await listHyperspinPlatforms();
       setPlatforms(items);
       setSelectedIndex(0);
     } catch (error) {
@@ -127,7 +125,7 @@ export function PlatformSelectionScreen({
     } finally {
       setLoadingPlatforms(false);
     }
-  }, [themesBasePath]);
+  }, []);
 
   useEffect(() => {
     if (!visible) return;

@@ -70,7 +70,9 @@ export function GamesPage() {
   const [gamesError, setGamesError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
-  const [launchingGameName, setLaunchingGameName] = useState<string | null>(null);
+  const [launchingGameName, setLaunchingGameName] = useState<string | null>(
+    null,
+  );
   const [keyboardUnlockAt, setKeyboardUnlockAt] = useState(0);
 
   const wheelContainerRef = useRef<HTMLDivElement | null>(null);
@@ -134,8 +136,6 @@ export function GamesPage() {
 
     try {
       const items = await listHyperspinGames({
-        hyperspinBasePath: "E:/HyperSpin_1.5.1",
-        mediaBasePath: "E:/HyperSpin_1.5.1/Media",
         platformName: platform.name,
       });
 

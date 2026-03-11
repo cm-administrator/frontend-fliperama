@@ -20,10 +20,7 @@ export function PlatformSelectionPage() {
 
   return (
     <HyperspinThemeProvider>
-      <PlatformSelectionScreen
-        themesBasePath="E:/HyperSpin_1.5.1/Media"
-        onSelectPlatform={handleSelectPlatform}
-      />
+      <PlatformSelectionScreen onSelectPlatform={handleSelectPlatform} />
     </HyperspinThemeProvider>
   );
 }

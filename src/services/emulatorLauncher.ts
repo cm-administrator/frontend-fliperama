@@ -5,7 +5,7 @@ export async function launchSelectedGame(params: {
   platformName: string;
   romName: string;
 }) {
-  const runtimeConfig = getPlatformRuntimeConfig(params.platformName);
+  const runtimeConfig = await getPlatformRuntimeConfig(params.platformName);
 
   if (runtimeConfig.launchProfile !== "mame") {
     throw new Error(

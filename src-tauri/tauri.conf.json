@@ -27,12 +27,22 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPDATA/**", "$APPLOCALDATA/**", "E:/**"]
+        "scope": [
+          "$HOME/**",
+          "$DOWNLOAD/**",
+          "$DOCUMENT/**",
+          "$DESKTOP/**",
+          "$APPDATA/**",
+          "$APPLOCALDATA/**",
+          "E:/**"
+        ]
       },
       "capabilities": [
         {
           "identifier": "default",
-          "windows": ["main"],
+          "windows": [
+            "main"
+          ],
           "permissions": [
             "core:window:allow-show",
             "core:window:allow-hide",

@@ -1,6 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { join } from "@tauri-apps/api/path";
 import { exists, readDir } from "@tauri-apps/plugin-fs";
+import { loadRuntimeIniConfig } from "./iniConfig";
 
 export type HyperspinPlatformTheme = {
   name: string;
@@ -61,12 +62,14 @@ async function buildNamedFileMap(
   return files;
 }
 
-export async function listHyperspinPlatforms(
-  mediaBasePath: string,
-): Promise<HyperspinPlatformTheme[]> {
-  const themesDir = await join(mediaBasePath, "main_menu", "Themes");
-  const wheelDir = await join(mediaBasePath, "main_menu", "Images", "Wheel");
-  const videoDir = await join(mediaBasePath, "main_menu", "Video");
+export async function listHyperspinPlatforms(): Promise<
+  HyperspinPlatformTheme[]
+> {
+  const { themesBasePath } = await loadRuntimeIniConfig();
+
+  const themesDir = await join(themesBasePath, "main_menu", "Themes");
+  const wheelDir = await join(themesBasePath, "main_menu", "Images", "Wheel");
+  const videoDir = await join(themesBasePath, "main_menu", "Video");
 
   if (!(await exists(themesDir))) {
     throw new Error(`Pasta não encontrada: ${themesDir}`);

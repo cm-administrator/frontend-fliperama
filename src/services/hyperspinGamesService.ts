@@ -1,6 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { join } from "@tauri-apps/api/path";
 import { readDir, readTextFile } from "@tauri-apps/plugin-fs";
+import { loadRuntimeIniConfig } from "./iniConfig";
 import { getPlatformRuntimeConfig } from "./platformRuntimeConfig";
 
 export type HyperspinGame = {
@@ -115,17 +116,15 @@ async function buildRomMap(
 }
 
 export async function listHyperspinGames(params: {
-  hyperspinBasePath: string;
-  mediaBasePath: string;
   platformName: string;
 }): Promise<HyperspinGame[]> {
-  const { hyperspinBasePath, mediaBasePath, platformName } = params;
+  const { platformName } = params;
 
-  const runtimeConfig = getPlatformRuntimeConfig(platformName);
+  const runtimeConfig = await getPlatformRuntimeConfig(platformName);
+  const { databasePath, mediaBasePath } = await loadRuntimeIniConfig();
 
   const databaseXmlPath = await join(
-    hyperspinBasePath,
-    "Databases",
+    databasePath,
     platformName,
     `${platformName}.xml`,
   );

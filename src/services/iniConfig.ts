@@ -1,4 +1,3 @@
-// src/services/iniConfig.ts
 import { appConfigDir, join } from "@tauri-apps/api/path";
 import {
   exists,
@@ -37,6 +36,14 @@ function parseIni(text: string): IniData {
   return out;
 }
 
+function parseList(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 async function ensureIni(): Promise<string> {
   const cfgDir = await appConfigDir();
   const iniPath = await join(cfgDir, "yt-overlay.ini");
@@ -46,38 +53,15 @@ async function ensureIni(): Promise<string> {
   const has = await exists(iniPath);
   if (!has) {
     const defaultIni = `; yt-overlay.ini
-;
-; Arquivo de configuração do aplicativo.
-; Como editar:
-; 1) Feche o aplicativo
-; 2) Edite e salve este arquivo
-; 3) Abra o aplicativo novamente
-;
-; Comentários começam com ';' ou '#'.
 
-[ads]
-; Caminho para o ZIP de anúncios OU para uma PASTA contendo 1+ zips.
-; - Se for pasta: o app escolhe automaticamente o zip mais recente pelo NOME.
-; - Se for arquivo: o app usa esse zip diretamente.
-;
-; Recomendação de nome dos zips (ordenável por data):
-;   2026-02-03T11-19.zip
-; ou 20260203T111900.zip
-;
-; Exemplos:
-; zipPath=C:\\Users\Samuel\\Documents\\ads\\2026-02-03T11-19.zip
-; zipPath=C:\\Users\\Samuel\\Documents\\ads\\
-zipPath=
-
-[player]
-; Intervalo de atualização (em minutos).
-; - intervalMinutes=0     -> modo contínuo (não agenda timer; roda conforme a lógica de execução atual do player)
-; - intervalMinutes>0     -> roda a cada N minutos (ex.: 0.5 = 30s)
-;
-; Limites:
-; - mínimo: 0.05 (3 segundos)
-; - máximo: 1440 (24 horas)
-intervalMinutes=0.5
+[runtime]
+emulatorPath=
+romsDir=
+mediaBasePath=
+databasePath=
+themesBasePath=
+acceptedRomExtensions=.zip,.7z
+launchProfile=mame
 `;
     await writeTextFile(iniPath, defaultIni);
   }
@@ -91,43 +75,87 @@ async function readIni(): Promise<{ iniPath: string; ini: IniData }> {
   return { iniPath, ini: parseIni(iniText) };
 }
 
-function parseNumber(
-  raw: string,
-  fallback: number,
-  opts?: { min?: number; max?: number },
-): number {
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return fallback;
-  if (opts?.min !== undefined && n < opts.min) return fallback;
-  if (opts?.max !== undefined && n > opts.max) return fallback;
-  return n;
-}
+export type PlatformLaunchProfile = "mame";
 
-export type AppConfig = {
+export type RuntimeIniConfig = {
   iniPath: string;
-  adsZipPath: string | null;
-  intervalMinutes: number; // sempre retorna um número válido
+  emulatorPath: string;
+  romsDir: string;
+  mediaBasePath: string;
+  databasePath: string;
+  themesBasePath: string;
+  acceptedRomExtensions: string[];
+  launchProfile: PlatformLaunchProfile;
 };
 
-export async function loadAppConfig(): Promise<AppConfig> {
+export async function loadRuntimeIniConfig(): Promise<RuntimeIniConfig> {
   const { iniPath, ini } = await readIni();
 
-  const adsZipPath = (ini.ads?.zipPath ?? "").trim() || null;
+  const emulatorPath = (ini.runtime?.emulatorPath ?? "").trim();
+  const romsDir = (ini.runtime?.romsDir ?? "").trim();
+  const mediaBasePath = (ini.runtime?.mediaBasePath ?? "").trim();
+  const databasePath = (ini.runtime?.databasePath ?? "").trim();
+  const themesBasePath = (ini.runtime?.themesBasePath ?? "").trim();
+  const acceptedRomExtensions = parseList(ini.runtime?.acceptedRomExtensions);
+  const rawLaunchProfile = (ini.runtime?.launchProfile ?? "").trim();
 
-  const raw = (ini.player?.intervalMinutes ?? "").trim();
-
-  const intervalMinutes =
-    raw === "0" ? 0 : parseNumber(raw, 0.5, { min: 0.05, max: 1440 });
-  return { iniPath, adsZipPath, intervalMinutes };
-}
-
-export async function requireAdsZipPath(): Promise<string> {
-  const cfg = await loadAppConfig();
-  if (!cfg.adsZipPath) {
+  if (!emulatorPath) {
     throw new Error(
-      `zipPath não configurado. Edite o arquivo:\n${cfg.iniPath}\n\n` +
-        `Na seção [ads], informe zipPath=...`,
+      `emulatorPath não configurado. Edite o arquivo:\n${iniPath}\n\n` +
+        `Na seção [runtime], informe emulatorPath=...`,
     );
   }
-  return cfg.adsZipPath;
+
+  if (!romsDir) {
+    throw new Error(
+      `romsDir não configurado. Edite o arquivo:\n${iniPath}\n\n` +
+        `Na seção [runtime], informe romsDir=...`,
+    );
+  }
+
+  if (!mediaBasePath) {
+    throw new Error(
+      `mediaBasePath não configurado. Edite o arquivo:\n${iniPath}\n\n` +
+        `Na seção [runtime], informe mediaBasePath=...`,
+    );
+  }
+
+  if (!databasePath) {
+    throw new Error(
+      `databasePath não configurado. Edite o arquivo:\n${iniPath}\n\n` +
+        `Na seção [runtime], informe databasePath=...`,
+    );
+  }
+
+  if (!themesBasePath) {
+    throw new Error(
+      `themesBasePath não configurado. Edite o arquivo:\n${iniPath}\n\n` +
+        `Na seção [runtime], informe themesBasePath=...`,
+    );
+  }
+
+  if (acceptedRomExtensions.length === 0) {
+    throw new Error(
+      `acceptedRomExtensions não configurado. Edite o arquivo:\n${iniPath}\n\n` +
+        `Na seção [runtime], informe acceptedRomExtensions=.zip,.7z`,
+    );
+  }
+
+  if (rawLaunchProfile !== "mame") {
+    throw new Error(
+      `launchProfile inválido no arquivo:\n${iniPath}\n\n` +
+        `Valor aceito atualmente: mame`,
+    );
+  }
+
+  return {
+    iniPath,
+    emulatorPath,
+    romsDir,
+    mediaBasePath,
+    databasePath,
+    themesBasePath,
+    acceptedRomExtensions,
+    launchProfile: "mame",
+  };
 }
