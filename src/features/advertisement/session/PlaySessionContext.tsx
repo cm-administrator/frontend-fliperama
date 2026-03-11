@@ -28,11 +28,15 @@ type PlaySessionContextValue = {
 
 const PlaySessionContext = createContext<PlaySessionContextValue | null>(null);
 
-async function openMiniOverlayWindow() {
+async function pinMiniOverlayWindow() {
   await invoke("ensure_overlay_mini_window");
   const overlayMini = await WebviewWindow.getByLabel("overlay_mini");
-  await overlayMini?.show();
-  await overlayMini?.unminimize();
+
+  if (!overlayMini) return;
+
+  await overlayMini.setAlwaysOnTop(true);
+  await overlayMini.show();
+  await overlayMini.unminimize();
 }
 
 async function closeMiniOverlayWindow() {
@@ -103,7 +107,7 @@ export function PlaySessionProvider({ children }: { children: ReactNode }) {
     if (isMiniOverlayWindow) return;
 
     if (isSessionActive) {
-      openMiniOverlayWindow().catch(() => {
+      pinMiniOverlayWindow().catch(() => {
         // ambiente web/dev sem runtime tauri
       });
       return;
@@ -112,6 +116,26 @@ export function PlaySessionProvider({ children }: { children: ReactNode }) {
     closeMiniOverlayWindow().catch(() => {
       // ambiente web/dev sem runtime tauri
     });
+  }, [isMiniOverlayWindow, isSessionActive]);
+
+  useEffect(() => {
+    if (isMiniOverlayWindow || !isSessionActive) return;
+
+    const repin = () => {
+      pinMiniOverlayWindow().catch(() => {
+        // ambiente web/dev sem runtime tauri
+      });
+    };
+
+    const timer = window.setInterval(repin, 1500);
+    window.addEventListener("focus", repin);
+    document.addEventListener("visibilitychange", repin);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", repin);
+      document.removeEventListener("visibilitychange", repin);
+    };
   }, [isMiniOverlayWindow, isSessionActive]);
 
   const value = useMemo<PlaySessionContextValue>(
